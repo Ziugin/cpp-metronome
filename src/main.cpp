@@ -45,7 +45,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         }
         
         // Catch up if nextClickFrame falls behind (avoid missing clicks).
-        while (nextClickFrame <= globalFrame) {
+        while (nextClickFrame < globalFrame) {
             nextClickFrame += framesPerBeat;
         }
         
