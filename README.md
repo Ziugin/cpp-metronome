@@ -8,12 +8,9 @@ This project focuses on:
 - Basic signal generation
 
 Current features:
-- Fixed BPM metronome click
 - Stereo playback using floating-point samples
 - Adjustable BPM via user input
-
-Planned improvements:
-- Improved click sound (sine tone / envelope)
+- Sine tone click sound with envelope
 
 This project was built as a learning exercise to better understand real-time audio callbacks, 
 timing and scheduling in audio systems, and to practice using Git for iterative development.

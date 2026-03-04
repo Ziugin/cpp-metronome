@@ -6,9 +6,8 @@
 // Audio is processed in "frames": 1 frame = 1 sample per channel at a single time instant.
 // With stereo (2 channels), each frame has 2 samples (L and R), interleaved in the output buffer.
 
-// To-do:   1. Add nicer click sound using a sine tone.
-
 #include <iostream>
+#include <cmath>
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
@@ -30,9 +29,12 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         static ma_uint64 nextClickFrame = 0;
         // nextClickFrame stores the frame number at which the next metronome click should start.
 
+        static ma_uint64 clickFrame = 0;
+        // Tracks how many frames into the current click have been rendered across multiple callbacks.
+
         const  ma_uint32 sampleRate = pDevice->sampleRate;
         const  ma_uint64 framesPerBeat = (ma_uint64)(sampleRate*60/bpm->load());
-        const  ma_uint32 clickLenFrames = (ma_uint32)(sampleRate*0.003);
+        const  ma_uint32 clickLenFrames = (ma_uint32)(sampleRate*0.15);
 
         ma_uint64 offset = 0;
         bool doClick = false;
@@ -46,21 +48,28 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         while (nextClickFrame <= globalFrame) {
             nextClickFrame += framesPerBeat;
         }
-
+        
         // Schedule the next click.
         if (nextClickFrame < globalFrame + frameCount) {
             doClick = true;
             offset = nextClickFrame - globalFrame;
+            clickFrame = 0;
             nextClickFrame += framesPerBeat;
         }
-
+        
+        // Write the sine tone to the device's audio channels if a click is scheduled and silence otherwise.
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             for (ma_uint32 channel = 0; channel < channels; ++channel) {
-                if (doClick && (frame >= offset && frame < (offset + clickLenFrames))) {
-                    out[frame * channels + channel] = 0.25f*(1.0f - (float)(frame - offset)/(float)clickLenFrames);
+                if (clickFrame < clickLenFrames && frame >= (doClick ? offset : 0)) {
+                    float t = (float)clickFrame / (float)sampleRate;                                        // Time elapsed since the click started
+                    float envelope = 1.0f - (float)clickFrame / (float)clickLenFrames;                      // Fade out for each click 
+                    out[frame * channels + channel] = 0.25f * sin(2.0f * M_PI * 880.0f * t) * envelope;     // 880Hz sine tone
                 } else {
                     out[frame * channels + channel] = 0.0f;
                 }
+            }
+            if (clickFrame < clickLenFrames && frame >= (doClick ? offset : 0)) {
+                clickFrame++;
             }
         }
         globalFrame += frameCount;
@@ -68,7 +77,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 
 int main() {
 
-    std::atomic <int> bpm = 90;
+    std::atomic<int> bpm = 90;
     // Shared BPM variable that is read in the audio data callback
     // thread and written to in the main user input thread.
     
@@ -86,21 +95,23 @@ int main() {
 
     ma_device_start(&device);     // Start the device manually as it is sleeping by default.
     
-    std::cout << "Device started" << std::endl;
-    std::cout << "Enter an positive integer to change the BPM. Enter 0 to stop the metronome" << std::endl;
+    std::cout << "Metronome started" << std::endl;
+    std::cout << "Enter a positive integer between 1 and 300 to change the BPM. Enter 0 to stop the metronome" << std::endl;
 
     // User input loop to adjust BPM.
     int input = 90;
     while (input != 0) {
         std::cout << "BPM: ";
         std::cin >> input;
-        if (input < 0) {
-            std::cout << "BPM must be a positive integer" << std::endl;
+        if (input < 0 || input > 300) {
+            std::cout << "BPM must be between 1 and 300" << std::endl;
         } else {
             bpm = input;
         }
     }
     
     ma_device_uninit(&device);
+    std::cout << "Metronome stopped" << std::endl;
+
     return 0;
 }
