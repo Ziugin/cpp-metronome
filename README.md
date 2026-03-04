@@ -10,9 +10,9 @@ This project focuses on:
 Current features:
 - Fixed BPM metronome click
 - Stereo playback using floating-point samples
+- Adjustable BPM via user input
 
 Planned improvements:
-- Adjustable BPM
 - Improved click sound (sine tone / envelope)
 
 This project was built as a learning exercise to better understand real-time audio callbacks, 

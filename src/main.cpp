@@ -6,8 +6,7 @@
 // Audio is processed in "frames": 1 frame = 1 sample per channel at a single time instant.
 // With stereo (2 channels), each frame has 2 samples (L and R), interleaved in the output buffer.
 
-// To-do:   1. Add adjustable BPM by prompting the user on the console. 
-//          2. Add nicer click sound using a sine tone.
+// To-do:   1. Add nicer click sound using a sine tone.
 
 #include <iostream>
 #define MINIAUDIO_IMPLEMENTATION
@@ -18,7 +17,9 @@
 // frameCount represents number of frames requested this call. 
 // Must write exactly frameCount * channels samples into pOutput every call.
 void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
-
+        
+        std::atomic<int>* bpm = static_cast<std::atomic<int>*>(pDevice->pUserData);
+        
         float* out = (float*)pOutput;
         ma_uint32 channels = pDevice->playback.channels;
 
@@ -30,8 +31,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         // nextClickFrame stores the frame number at which the next metronome click should start.
 
         const  ma_uint32 sampleRate = pDevice->sampleRate;
-        const  ma_uint32 bpm = 120;
-        const  ma_uint64 framesPerBeat = (ma_uint64)(sampleRate*60/bpm);
+        const  ma_uint64 framesPerBeat = (ma_uint64)(sampleRate*60/bpm->load());
         const  ma_uint32 clickLenFrames = (ma_uint32)(sampleRate*0.003);
 
         ma_uint64 offset = 0;
@@ -47,6 +47,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
             nextClickFrame += framesPerBeat;
         }
 
+        // Schedule the next click.
         if (nextClickFrame < globalFrame + frameCount) {
             doClick = true;
             offset = nextClickFrame - globalFrame;
@@ -55,7 +56,7 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 
         for (ma_uint32 frame = 0; frame < frameCount; ++frame) {
             for (ma_uint32 channel = 0; channel < channels; ++channel) {
-                if (doClick && (frame >= offset && frame < offset + clickLenFrames)) {
+                if (doClick && (frame >= offset && frame < (offset + clickLenFrames))) {
                     out[frame * channels + channel] = 0.25f*(1.0f - (float)(frame - offset)/(float)clickLenFrames);
                 } else {
                     out[frame * channels + channel] = 0.0f;
@@ -67,24 +68,38 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 
 int main() {
 
+    std::atomic <int> bpm = 90;
+    // Shared BPM variable that is read in the audio data callback
+    // thread and written to in the main user input thread.
+    
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format   = ma_format_f32;       // Use 32-bit float samples.
     config.playback.channels = 2;                   // Use 2 channels (stereo) for the device.
     config.sampleRate        = 48000;               // Set sample rate to 48000 Hz.
     config.dataCallback      = data_callback;       // This function will be called when miniaudio needs more data.
-    config.pUserData         = nullptr;             // Can be accessed from the device object (device.pUserData).
+    config.pUserData         = &bpm;                // Can be accessed from the device object (device.pUserData).
 
     ma_device device;
     if (ma_device_init(NULL, &config, &device) != MA_SUCCESS) {
         return -1;  // Failed to initialize the device.
     }
 
-    ma_device_start(&device);   // Start the device manually as it is sleeping by default.
+    ma_device_start(&device);     // Start the device manually as it is sleeping by default.
     
     std::cout << "Device started" << std::endl;
+    std::cout << "Enter an positive integer to change the BPM. Enter 0 to stop the metronome" << std::endl;
 
-    std::cout << "Press Enter to stop...";
-    std::cin.get();     // Keep the program running until 'Enter' is pressed.
+    // User input loop to adjust BPM.
+    int input = 90;
+    while (input != 0) {
+        std::cout << "BPM: ";
+        std::cin >> input;
+        if (input < 0) {
+            std::cout << "BPM must be a positive integer" << std::endl;
+        } else {
+            bpm = input;
+        }
+    }
     
     ma_device_uninit(&device);
     return 0;
