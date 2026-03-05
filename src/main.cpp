@@ -106,21 +106,23 @@ int main() {
 
     ma_device_start(&device);     // Start the device manually as it is sleeping by default.
     
-    std::cout << "Metronome started" << std::endl;
-    std::cout << "Enter a positive integer between 1 and 300 to change the BPM. Enter 0 to stop the metronome" << std::endl;
+    std::cout << "Metronome started at 90 BPM" << std::endl;
+    std::cout << "Enter a positive integer between 40 and 300 to set the BPM. Enter 0 to stop the metronome" << std::endl;
 
-    // User input loop to adjust BPM.
-    int inputBpm = 90;  
-    while (inputBpm != 0) {
+    // User input loop to set the BPM.
+    int inputBpm;
+    do {
         std::cout << "BPM: ";
         std::cin >> inputBpm;
-        if (inputBpm < 0 || inputBpm > 300) {
-            std::cout << "BPM must be between 1 and 300" << std::endl;
-        } else {
-            metronome.changeBpm = true;
-            metronome.bpm = inputBpm;
+        if (inputBpm != 0) {
+            if (inputBpm < 40 || inputBpm > 300) {
+                std::cout << "BPM must be between 40 and 300" << std::endl;
+            } else {
+                metronome.changeBpm = true;
+                metronome.bpm = inputBpm;
+            }
         }
-    }
+    } while (inputBpm != 0);
     
     ma_device_uninit(&device);
     std::cout << "Metronome stopped" << std::endl;

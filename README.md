@@ -9,7 +9,7 @@ This project focuses on:
 
 Current features:
 - Stereo playback using floating-point samples
-- Adjustable BPM via user input
+- Adjustable BPM via user input (40-300)
 - Sine tone click sound with envelope
 
 This project was built as a learning exercise to better understand real-time audio callbacks, 
